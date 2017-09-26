@@ -47,8 +47,8 @@ all:
 
 #+
 burn:
-	arduino-builder -libraries /home/dfly/Code/Arduino/libraries -hardware /home/dfly/Code/Arduino/hardware/ -tools /usr/bin/ -build-path `pwd` -fqbn archlinux-arduino:avr:leonardo piserverpanel/piserverpanel.ino
+	arduino-builder -build-path /home/dfly/Code/PiServerPanel/compile -libraries /home/dfly/Code/Arduino/libraries -hardware /home/dfly/Code/Arduino/hardware/ -tools /usr/bin/ -fqbn archlinux-arduino:avr:leonardo piserverpanel/piserverpanel.ino
 	python reset-leonardo.py $(PORT)
 	sleep 1
-	avrdude -p$(MCU) -cavr109 -P$(PORT) -b57600 -D -Uflash:w:./piserverpanel.ino.hex:i
+	avrdude -p$(MCU) -cavr109 -P$(PORT) -b57600 -D -Uflash:w:compile/piserverpanel.ino.hex:i
 
