@@ -3,7 +3,7 @@
 import serial, sys, time
 
 def heartbeat():
-	ser.write(B'\x42')
+	send_heartbeat()
 
 def shutdown():
 	command = "/sbin/shutdown -h -t sec 30"
@@ -12,7 +12,7 @@ def shutdown():
 	output = process.communicate()[0]
 	print(output)
 	ser.flushOutput()
-	ser.write(B'\x108')
+	send_ack()
 
 def abort_shutdown():
 	command = "/sbin/shutdown -c"
@@ -21,6 +21,18 @@ def abort_shutdown():
 	output = process.communicate()[0]
 	print(output)
 	ser.flushOutput()
+	send_abort()
+
+def mode2heartbeat():
+	mode = "heartbeat"
+
+def send_heartbeat():
+	ser.write(B'\x42')
+
+def send_ack():
+	ser.write(B'\x108')
+
+def send_abort():
 	ser.write(B'\x109')
 
 try:
@@ -38,17 +50,21 @@ ser = serial.Serial(
 
 mode = "heartbeat"
 
-commands = {	"heartbeat": heartbeat,
-		"shutdown": shutdown,
+commands = {	"heartbeat":      heartbeat,
+		"shutdown":       shutdown,
 		"abort shutdown": abort_shutdown,
+		"ok":             mode2heartbeat,
 }
 
-millis = int(round(time.time() * 1000))
+heartbeats = {	"heartbeat":      send_heartbeat,
+		"shutdown":       send_ack,
+		"abort shutdown": send_abort,
+}
 
 ser.isOpen()
 while True:
 	print(mode)
-	commands[mode]()
+	heartbeats[mode]()
 	end_wait = int(round(time.time() * 1000)) + 2900
 	while (int(round(time.time() * 1000)) < end_wait):
 		bytesToRead = ser.inWaiting()
@@ -56,6 +72,7 @@ while True:
 			cmd = str(ser.readline(), "utf-8")[:-2]
 			print(cmd)
 			ser.flushInput()
+			mode = cmd
 			commands[cmd]()
 
 ser.close()
