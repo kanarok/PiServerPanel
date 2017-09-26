@@ -55,7 +55,7 @@ commands = {	"heartbeat":      heartbeat,
 		"abort shutdown": abort_shutdown,
 		"ok":             mode2heartbeat,
 }
-
+ls
 heartbeats = {	"heartbeat":      send_heartbeat,
 		"shutdown":       send_ack,
 		"abort shutdown": send_abort,
