@@ -65,7 +65,7 @@ ser.isOpen()
 while True:
 	print(mode)
 	heartbeats[mode]()
-	end_wait = int(round(time.time() * 1000)) + 2900
+	end_wait = int(round(time.time() * 1000)) + 2950
 	while (int(round(time.time() * 1000)) < end_wait):
 		bytesToRead = ser.inWaiting()
 		if (bytesToRead > 0):
