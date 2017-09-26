@@ -1,3 +1,6 @@
+#include <Arduino.h>
+#line 1 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
+#line 1 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
 #include <TimerOne.h>
 
 #define LED_R                       6
@@ -78,6 +81,11 @@ int incomingByte = 0;
 unsigned long heartbeat, track_last_heartbeat, track_missing_heartbeat, track_uart;
 int show_missing_beat = 1;
 
+#line 81 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
+void setup();
+#line 103 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
+void loop();
+#line 81 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
 void setup() {
   pinMode(PUSHLOCK_NO, INPUT_PULLUP);
   pinMode(PUSHLOCK_NC, INPUT_PULLUP);
@@ -548,3 +556,4 @@ void *server_locked() {
     return server_bootable;
   }
 }
+

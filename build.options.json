@@ -1,0 +1,10 @@
+{
+  "builtInLibrariesFolders": "",
+  "customBuildProperties": "",
+  "fqbn": "archlinux-arduino:avr:leonardo",
+  "hardwareFolders": "/home/dfly/Code/Arduino/hardware",
+  "otherLibrariesFolders": "/home/dfly/Code/Arduino/libraries",
+  "runtime.ide.version": "10600",
+  "sketchLocation": "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino",
+  "toolsFolders": "/usr/bin/"
+}

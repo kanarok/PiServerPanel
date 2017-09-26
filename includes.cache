@@ -1,0 +1,27 @@
+[
+  {
+    "Sourcefile": "",
+    "Include": "",
+    "Includepath": "/home/dfly/Code/Arduino/hardware/archlinux-arduino/avr/cores/arduino"
+  },
+  {
+    "Sourcefile": "",
+    "Include": "",
+    "Includepath": "/home/dfly/Code/Arduino/hardware/archlinux-arduino/avr/variants/leonardo"
+  },
+  {
+    "Sourcefile": "/home/dfly/Code/PiServerPanel/sketch/piserverpanel.ino.cpp",
+    "Include": "TimerOne.h",
+    "Includepath": "/home/dfly/Code/Arduino/libraries/TimerOne-r11"
+  },
+  {
+    "Sourcefile": "/home/dfly/Code/PiServerPanel/sketch/piserverpanel.ino.cpp",
+    "Include": "",
+    "Includepath": ""
+  },
+  {
+    "Sourcefile": "/home/dfly/Code/Arduino/libraries/TimerOne-r11/TimerOne.cpp",
+    "Include": "",
+    "Includepath": ""
+  }
+]

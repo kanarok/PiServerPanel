@@ -1,26 +1,9 @@
-#include <TimerOne.h>
-
-#define LED_R                       6
-#define LED_G                       9
-#define LED_B                      10
-
-#define BUTTON                      2
-#define PUSHLOCK_NO                 7
-#define PUSHLOCK_NC                 3
-
-#define LOCKED                    LOW
-#define UNLOCKED                 HIGH
-#define UNDEFINED                   2
-
-#define HEARTBEAT_TIMEOUT       10000
-#define HEARTBEAT_SMALL_TIMEOUT  3333
-
-#define RUN                         8
-
-#define BAUDRATE               115200
-
+# 1 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
+# 1 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
+# 2 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino" 2
+# 22 "/home/dfly/Code/PiServerPanel/piserverpanel/piserverpanel.ino"
 //isr
-void isr_button_push();       //obsolete?
+void isr_button_push(); //obsolete?
 void isr_pushlock_change();
 
 //physical routines
@@ -46,14 +29,14 @@ void led_off();
 void led_red();
 
 //States                          //state matching led animations
-void *server_bootable();          void animate_bootable();
-void *server_booting();           void animate_booting();
-void *server_running();           void animate_running();
-void *server_shutdown();          void animate_shutdown();
-void *server_shutdown_active();   void animate_shutdown_active();
-void *server_hungup();            void animate_hungup(byte del);
-void *server_reset();             void animate_reset();
-void *server_locked();            void animate_locked();
+void *server_bootable(); void animate_bootable();
+void *server_booting(); void animate_booting();
+void *server_running(); void animate_running();
+void *server_shutdown(); void animate_shutdown();
+void *server_shutdown_active(); void animate_shutdown_active();
+void *server_hungup(); void animate_hungup(byte del);
+void *server_reset(); void animate_reset();
+void *server_locked(); void animate_locked();
 
 //FSM
 typedef void *(*StateFunc)();
@@ -62,7 +45,7 @@ StateFunc statefunc = server_bootable();
 //++++ cleanup due!
 
 byte button = 0;
-byte pushlock = UNDEFINED;
+byte pushlock = 2;
 
 int c_r = 0;
 int c_g = 0;
@@ -79,30 +62,30 @@ unsigned long heartbeat, track_last_heartbeat, track_missing_heartbeat, track_ua
 int show_missing_beat = 1;
 
 void setup() {
-  pinMode(PUSHLOCK_NO, INPUT_PULLUP);
-  pinMode(PUSHLOCK_NC, INPUT_PULLUP);
-  pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(7, 0x2);
+  pinMode(3, 0x2);
+  pinMode(2, 0x2);
 
-  pinMode(LED_R, OUTPUT);
-  pinMode(LED_G, OUTPUT);
-  pinMode(LED_B, OUTPUT);
-  pinMode(RUN, OUTPUT);
+  pinMode(6, 0x1);
+  pinMode(9, 0x1);
+  pinMode(10, 0x1);
+  pinMode(8, 0x1);
 
-  attachInterrupt(digitalPinToInterrupt(BUTTON), isr_button_push, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PUSHLOCK_NO), isr_pushlock_change, CHANGE);
+  attachInterrupt(((2) == 0 ? 2 : ((2) == 1 ? 3 : ((2) == 2 ? 1 : ((2) == 3 ? 0 : ((2) == 7 ? 4 : -1))))), isr_button_push, 2);
+  attachInterrupt(((7) == 0 ? 2 : ((7) == 1 ? 3 : ((7) == 2 ? 1 : ((7) == 3 ? 0 : ((7) == 7 ? 4 : -1))))), isr_pushlock_change, 1);
   //attachInterrupt(digitalPinToInterrupt(PUSHLOCK_NC), pushlock_open, CHANGE);
 
-  pushlock = digitalRead(PUSHLOCK_NO);
+  pushlock = digitalRead(7);
 
   track_last_heartbeat = millis();
   track_missing_heartbeat = track_last_heartbeat;
 
-  Serial.begin(BAUDRATE);
+  Serial.begin(115200);
 }
 
 void loop() {
   heartbeat = detect_heartbeat();
-  statefunc = (StateFunc)(*statefunc)();    //FSM
+  statefunc = (StateFunc)(*statefunc)(); //FSM
 }
 
 //isr
@@ -111,7 +94,7 @@ void isr_button_push() {
 }
 
 void isr_pushlock_change() {
-  pushlock = digitalRead(PUSHLOCK_NO);
+  pushlock = digitalRead(7);
 }
 
 //physical routines
@@ -123,16 +106,16 @@ void serial_flush() {
 }
 
 void touch_run_pin() {
-  digitalWrite(RUN, HIGH);
+  digitalWrite(8, 0x1);
   delay(50);
-  digitalWrite(RUN, LOW);
+  digitalWrite(8, 0x0);
 }
 
 //generic led routines
 void led_color(byte r, byte g, byte b) {
-  analogWrite(LED_R, 255-r);
-  analogWrite(LED_G, 255-g);
-  analogWrite(LED_B, 255-b);
+  analogWrite(6, 255-r);
+  analogWrite(9, 255-g);
+  analogWrite(10, 255-b);
 }
 
 void led_off() {
@@ -259,9 +242,9 @@ long get_last_heartbeat() {
 
 void animate_bootable() {
   int del = 45;
-  analogWrite(LED_R, 255);
-  analogWrite(LED_G, 255-c_g);
-  analogWrite(LED_B, 255);
+  analogWrite(6, 255);
+  analogWrite(9, 255-c_g);
+  analogWrite(10, 255);
 
   c_g = c_g - fade_g;
 
@@ -282,9 +265,9 @@ void animate_bootable() {
 
 void animate_booting() {
   int del = 20;
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255-c_g);
-  analogWrite(LED_B, 255-c_b);
+  analogWrite(6, 255-c_r);
+  analogWrite(9, 255-c_g);
+  analogWrite(10, 255-c_b);
 
   //analogWrite(LED_G, 255);
   //analogWrite(LED_B, 255);
@@ -314,9 +297,9 @@ void animate_running();
 
 void animate_shutdown() {
   int del = 20;
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255-c_r);
-  analogWrite(LED_B, 255);
+  analogWrite(6, 255-c_r);
+  analogWrite(9, 255-c_r);
+  analogWrite(10, 255);
 
   c_r = c_r + fade_b;
 
@@ -336,13 +319,13 @@ void animate_shutdown() {
 }
 
 void animate_shutdown_active() {
-  
+
 }
 
 void animate_hungup(byte del) {
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255);
-  analogWrite(LED_B, 255);
+  analogWrite(6, 255-c_r);
+  analogWrite(9, 255);
+  analogWrite(10, 255);
 
   c_r = c_r + fade_r;
 
@@ -368,19 +351,19 @@ void *server_bootable() {
     Serial.println("bootable");
   }
 
-  if (pushlock == LOCKED) {
+  if (pushlock == 0x0) {
     led_red();
     delay(80);
     return server_locked;
   } else {
     animate_bootable();
 
-    if ((get_last_heartbeat() < HEARTBEAT_TIMEOUT || detect_heartbeat() > 0 )) { // && Serial
+    if ((get_last_heartbeat() < 10000 || detect_heartbeat() > 0 )) { // && Serial
       serial_flush();
       return server_booting;
     }
 
-    if (digitalRead(BUTTON)) {
+    if (digitalRead(2)) {
       delay(100);
       track_last_heartbeat = millis();
       serial_flush();
@@ -422,7 +405,7 @@ void *server_running() {
     Serial.println(get_last_heartbeat());
   }
 
-  if (pushlock == LOCKED) {
+  if (pushlock == 0x0) {
     if (get_last_heartbeat() > 30000 || detect_heartbeat() < 0 ) {
 
       return server_locked;
@@ -431,7 +414,7 @@ void *server_running() {
       return server_shutdown;
     }
   } else {
-    if (get_last_heartbeat() > HEARTBEAT_TIMEOUT) {
+    if (get_last_heartbeat() > 10000) {
 
       return server_hungup;
     } else {
@@ -468,7 +451,7 @@ void *server_shutdown_active() {
   delay(100);
   led_red();
 
-  if (digitalRead(BUTTON)) {
+  if (digitalRead(2)) {
     delay(100);
     track_last_heartbeat = millis();
     serial_flush();
@@ -480,7 +463,7 @@ void *server_shutdown_active() {
     }
   }
 
-  if (get_last_heartbeat() < HEARTBEAT_TIMEOUT) {
+  if (get_last_heartbeat() < 10000) {
     serial_flush();
     return server_shutdown_active;
   } else {
@@ -498,12 +481,12 @@ void *server_hungup() {
   heartbeat = detect_heartbeat();
   heartbeat = get_last_heartbeat();
 
-  if (heartbeat < HEARTBEAT_TIMEOUT || detect_heartbeat() > 0) {
+  if (heartbeat < 10000 || detect_heartbeat() > 0) {
 
     return server_running;
   } else {
 
-    if (heartbeat > HEARTBEAT_TIMEOUT && heartbeat < 20000UL) {
+    if (heartbeat > 10000 && heartbeat < 20000UL) {
       animate_hungup(25);
     } else if (heartbeat > 20000UL && heartbeat < 30000UL) {
       animate_hungup(15);
@@ -539,7 +522,7 @@ void *server_locked() {
   if (Serial) {
     Serial.println("LOCKED");
   }
-  if (pushlock == LOCKED) {
+  if (pushlock == 0x0) {
     led_off();
     serial_flush();
     return server_locked;
