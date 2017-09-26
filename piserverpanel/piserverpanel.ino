@@ -44,6 +44,8 @@ void led_heartbeat_abort();
 void led_color(byte r, byte g, byte b);
 void led_off();
 void led_red();
+void led_green();
+void led_blue();
 
 //States                          //state matching led animations
 void *server_bootable();          void animate_bootable();
@@ -102,6 +104,7 @@ void setup() {
 
 void loop() {
   heartbeat = detect_heartbeat();
+  led_heartbeat_ack();
   statefunc = (StateFunc)(*statefunc)();    //FSM
 }
 
@@ -143,21 +146,30 @@ void led_red() {
   led_color(255, 0, 0);
 }
 
+void led_green() {
+  led_color(0, 255, 0);
+}
+
+void led_blue() {
+  led_color(0, 0, 255);
+}
+
 //heartbeat animations
 void led_heartbeat() {
-  led_color(0,255,0);
+  led_green();
   delay(10);
-  led_color(255,0,0);
+  led_red();
   delay(10);
-  led_color(0,0,0);
+  led_off();
   delay(15);
 }
+
 void led_heartbeat_missing() {
-  led_color(255,0,0);
+  led_red();
   delay(10);
-  led_color(255,0,0);
+  led_red();
   delay(10);
-  led_color(0,0,0);
+  led_off();
   delay(15);
 }
 
@@ -178,7 +190,6 @@ void led_heartbeat_abort() {
   led_color(0,0,0);
   delay(15);
 }
-
 
 //heartbeat detection
 long detect_heartbeat_any();
@@ -336,7 +347,7 @@ void animate_shutdown() {
 }
 
 void animate_shutdown_active() {
-  
+
 }
 
 void animate_hungup(byte del) {
