@@ -192,7 +192,9 @@ void led_heartbeat_abort() {
 }
 
 //heartbeat detection
-long detect_heartbeat_any();
+long detect_heartbeat_any() {
+
+}
 
 long detect_heartbeat() {
   int last_heartbeat = millis()-track_last_heartbeat;

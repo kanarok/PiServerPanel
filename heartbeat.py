@@ -1,6 +1,15 @@
 #!/usr/bin/env python
 
-import serial, sys, time
+import serial, sys, time, signal
+
+def handle_interrupt(signal, frame):
+	print("closing serial port...")
+	ser.close()
+	sys.exit(0)
+
+def handle_terminate(signal, frame):
+	print("terminated, sending 'system shutdown' to panel")
+	send_system_shutdown()
 
 def heartbeat():
 	send_heartbeat()
@@ -28,6 +37,9 @@ def mode2heartbeat():
 
 def send_heartbeat():
 	ser.write(B'\x42')
+
+def send_system_shutdown():
+	ser.write(B'\x54')
 
 def send_ack():
 	ser.write(B'\x108')
@@ -61,6 +73,9 @@ heartbeats = {	"heartbeat":      send_heartbeat,
 		"abort shutdown": send_abort,
 }
 
+signal.signal(signal.SIGINT, handle_interrupt)
+signal.signal(signal.SIGTERM, handle_terminate)
+
 ser.isOpen()
 while True:
 	print(mode)
@@ -73,6 +88,9 @@ while True:
 			print(cmd)
 			ser.flushInput()
 			mode = cmd
-			commands[cmd]()
+			try:
+				commands[cmd]()
+			except:
+				print("Command not found: ", cmd)
 
 ser.close()
