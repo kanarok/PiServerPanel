@@ -4,27 +4,32 @@
 #define LED_G                       9
 #define LED_B                      10
 
-#define BUTTON                      2
-#define PUSHLOCK_NO                 7
-#define PUSHLOCK_NC                 3
+#define BUTTON                      8
+#define PUSHLOCK                    4
+#define PUSHLOCK_NO                 4
+#define PUSHLOCK_NC                 5
 
 #define LOCKED                    LOW
 #define UNLOCKED                 HIGH
+#define IS_ON                    HIGH
+#define PUSHED                   HIGH
 #define UNDEFINED                   2
 
-#define HEARTBEAT_TIMEOUT       10000
-#define HEARTBEAT_SMALL_TIMEOUT  3333
+#define HEARTBEAT_TIMEOUT          10000
+#define HEARTBEAT_IS_MISSING        3333
+#define HEARTBEAT                   0x42
+#define HEARTBEAT_SYSTEM_SHUTDOWN   0x54
+#define HEARTBEAT_SHUTDOWN_ACK     0x108
+#define HEARTBEAT_ABORT_ACK        0x109
 
-#define RUN                         8
+#define SYSTEM_RUN                  7
+#define SYSTEN_ON                  A3
+#define TIME_UNTIL_REBOOT       60000UL
 
-#define BAUDRATE               115200
-
-//isr
-void isr_button_push();       //obsolete?
-void isr_pushlock_change();
+#define BAUDRATE               115200L
+#define WAIT_TO_SEND             1000
 
 //physical routines
-void serial_flush();
 void touch_run_pin();
 
 //heartbeat detection
@@ -34,18 +39,32 @@ long detect_heartbeat_ack();
 long detect_heartbeat_abort();
 long get_last_heartbeat();
 
-//heartbeat animations
-void led_heartbeat();
-void led_heartbeat_missing();
-void led_heartbeat_ack();
-void led_heartbeat_abort();
+//heartbeat signals
+void signal_heartbeat();
+void signal_heartbeat_missing();
+void signal_heartbeat_ack();
+void signal_heartbeat_abort();
+void signal_heartbeat_system_shutdown();
 
 //generic led routines
-void led_color(byte r, byte g, byte b);
-void led_off();
-void led_red();
-void led_green();
-void led_blue();
+void led_color(byte red, byte green, byte blue);
+void led_off(byte value);
+void led_white(byte value);
+void led_red(byte value);
+void led_green(byte value);
+void led_blue(byte value);
+
+//led signals
+void signal_server_locked();
+//void siganimate_
+
+//uart routines
+void serial_flush();
+void debug_print(char *msg);
+//uart messages
+void send_ok();
+void send_shutdown();
+void send_abort_shutdown();
 
 //States                          //state matching led animations
 void *server_bootable();          void animate_bootable();
@@ -53,18 +72,16 @@ void *server_booting();           void animate_booting();
 void *server_running();           void animate_running();
 void *server_shutdown();          void animate_shutdown();
 void *server_shutdown_active();   void animate_shutdown_active();
-void *server_hungup();            void animate_hungup(byte del);
-void *server_reset();             void animate_reset();
+void *server_hungup();            void animate_hungup();
 void *server_locked();            void animate_locked();
+void *system_reset();             void animate_reset();
+void *system_shutdown();  //async trigger in function detect_heartbeat();
 
 //FSM
 typedef void *(*StateFunc)();
-StateFunc statefunc = server_bootable();
+StateFunc statefunc = server_bootable;
 
 //++++ cleanup due!
-
-byte button = 0;
-byte pushlock = UNDEFINED;
 
 int c_r = 0;
 int c_g = 0;
@@ -77,24 +94,23 @@ int fdel = 1;
 int cmode = 0;
 
 int incomingByte = 0;
-unsigned long heartbeat, track_last_heartbeat, track_missing_heartbeat, track_uart;
-int show_missing_beat = 1;
+int receivedHeartbeat = 0;
+unsigned long heartbeat, last_heartbeat;
+unsigned long track_last_heartbeat, track_missing_heartbeat, track_uart;
+
 
 void setup() {
   pinMode(PUSHLOCK_NO, INPUT_PULLUP);
   pinMode(PUSHLOCK_NC, INPUT_PULLUP);
   pinMode(BUTTON, INPUT_PULLUP);
+  pinMode(SYSTEM_ON, INPUT_PULLUP);
 
   pinMode(LED_R, OUTPUT);
   pinMode(LED_G, OUTPUT);
   pinMode(LED_B, OUTPUT);
-  pinMode(RUN, OUTPUT);
+  pinMode(SYSTEM_RUN, OUTPUT);
 
-  attachInterrupt(digitalPinToInterrupt(BUTTON), isr_button_push, FALLING);
-  attachInterrupt(digitalPinToInterrupt(PUSHLOCK_NO), isr_pushlock_change, CHANGE);
-  //attachInterrupt(digitalPinToInterrupt(PUSHLOCK_NC), pushlock_open, CHANGE);
-
-  pushlock = digitalRead(PUSHLOCK_NO);
+  pushlock = digitalRead(PUSHLOCK);
 
   track_last_heartbeat = millis();
   track_missing_heartbeat = track_last_heartbeat;
@@ -104,26 +120,12 @@ void setup() {
 
 void loop() {
   heartbeat = detect_heartbeat();
-  led_heartbeat_ack();
+  last_heartbeat = get_last_heartbeat();
+
   statefunc = (StateFunc)(*statefunc)();    //FSM
 }
 
-//isr
-void isr_button_push() {
-  button = 1;
-}
-
-void isr_pushlock_change() {
-  pushlock = digitalRead(PUSHLOCK_NO);
-}
-
 //physical routines
-void serial_flush() {
-  int buf;
-  while (Serial.available() > 0) {
-      buf = Serial.read();
-  }
-}
 
 void touch_run_pin() {
   digitalWrite(RUN, HIGH);
@@ -132,30 +134,35 @@ void touch_run_pin() {
 }
 
 //generic led routines
-void led_color(byte r, byte g, byte b) {
-  analogWrite(LED_R, 255-r);
-  analogWrite(LED_G, 255-g);
-  analogWrite(LED_B, 255-b);
+void led_color(byte red, byte green, byte blue) {
+  analogWrite(LED_R, 255-red);
+  analogWrite(LED_G, 255-green);
+  analogWrite(LED_B, 255-blue);
 }
 
 void led_off() {
   led_color(0,0,0);
 }
 
-void led_red() {
-  led_color(255, 0, 0);
+void led_white(byte values {
+  led_color(255-value,255-value,255-value)
 }
 
-void led_green() {
-  led_color(0, 255, 0);
+void led_red(byte value) {
+  led_color(255-value, 255, 255);
 }
 
-void led_blue() {
-  led_color(0, 0, 255);
+void led_green(byte value) {
+  led_color(255, 255-byte value, 255);
 }
 
-//heartbeat animations
-void led_heartbeat() {
+void led_blue(byte value) {
+  led_color(255, 255, 255-byte value);
+}
+
+
+//heartbeat signals
+void signal_heartbeat() {
   led_green();
   delay(10);
   led_red();
@@ -164,7 +171,7 @@ void led_heartbeat() {
   delay(15);
 }
 
-void led_heartbeat_missing() {
+void signal_heartbeat_missing() {
   led_red();
   delay(10);
   led_red();
@@ -173,7 +180,7 @@ void led_heartbeat_missing() {
   delay(15);
 }
 
-void led_heartbeat_ack() {
+void signal_heartbeat_ack() {
   led_color(255,0,255);
   delay(10);
   led_color(255,0,255);
@@ -182,7 +189,7 @@ void led_heartbeat_ack() {
   delay(15);
 }
 
-void led_heartbeat_abort() {
+void signal_heartbeat_abort() {
   led_color(0,0,255);
   delay(10);
   led_color(255,255,255);
@@ -191,22 +198,29 @@ void led_heartbeat_abort() {
   delay(15);
 }
 
+<<<<<<< HEAD
+void signal_heartbeat_system_shutdown() {
+  led_color(0,0,255);
+  delay(10);
+  led_color(90,20,200);
+  delay(10);
+  led_color(0,0,0);
+  delay(15);
+=======
+//heartbeat detection
+long detect_heartbeat_any() {
+
+>>>>>>> c774d8b760525d033ce5c35391565738e5727941
+}
+
 //heartbeat detection
 long detect_heartbeat_any() {
 
 }
 
-long detect_heartbeat() {
-  int last_heartbeat = millis()-track_last_heartbeat;
-
-//  if (!Serial) {
-//    return -1;
-//  }
-
-  if (((millis()-track_missing_heartbeat) > 3000) && last_heartbeat > 3000) {
-    if (show_missing_beat == 1) {
-      led_heartbeat_missing();
-    }
+int detect_heartbeat() {
+  if (((millis()-track_missing_heartbeat) >= HEARTBEAT_IS_MISSING) && get_last_heartbeat() >= HEARTBEAT_IS_MISSING) {
+    signal_heartbeat_missing();
     track_missing_heartbeat = millis();
   }
 
@@ -215,13 +229,36 @@ long detect_heartbeat() {
 
     serial_flush();
 
-    if (incomingByte == 0x42) {
-      track_last_heartbeat = millis();
-      track_missing_heartbeat = track_last_heartbeat;
-      led_heartbeat();
-      return last_heartbeat;
-    } else {
-      return -1;
+    switch (incomingByte) {
+      case 0x42:  // heartbeat
+                  signal_heartbeat();
+                  break;
+      case 0x54:  // system shutdown
+                  statefunc = system_shutdown;
+                  signal_heartbeat_system_shutdown();
+                  break;
+      case 0x108: // ack
+                  signal_heartbeat_ack();
+                  send_ok();
+                  break;
+      case 0x109: // abort (ack)
+                  signal_heartbeat_abort();
+                  send_ok();
+                  break;
+    }
+
+    switch (incomingByte) {
+      case 0x42:  // heartbeat
+      case 0x54:  // system shutdown
+      case 0x108: // ack
+      case 0x109: // cancel (ack)
+                  receivedHeartbeat = incomingByte;
+                  track_last_heartbeat = millis();
+                  track_missing_heartbeat = track_last_heartbeat;
+                  return receivedHeartbeat;
+      default:
+                  receivedHeartbeat = -1;
+                  return receivedHeartbeat;
     }
   } else {
     return 0;
@@ -235,8 +272,8 @@ long detect_heartbeat_ack() {
     serial_flush();
 
     if (incomingByte == 0x108) {
-      Serial.println("ok");
-      led_heartbeat_ack();
+      send_ok();
+      signal_heartbeat_ack();
       return 1;
     } else {
       return 0;
@@ -253,8 +290,8 @@ long detect_heartbeat_abort() {
     serial_flush();
 
     if (incomingByte == 0x109) {
-      Serial.println("ok");
-      led_heartbeat_abort();
+      send_ok();
+      signal_heartbeat_abort();
       return 1;
     } else {
       return 0;
@@ -352,7 +389,7 @@ void animate_shutdown_active() {
 
 }
 
-void animate_hungup(byte del) {
+void animate_hungup() {
   analogWrite(LED_R, 255-c_r);
   analogWrite(LED_G, 255);
   analogWrite(LED_B, 255);
@@ -374,190 +411,286 @@ void animate_locked() {
 
 }
 
+//uart routines
+
+void serial_flush() {
+  int buf;
+  while (Serial.available() > 0) {
+      buf = Serial.read();
+  }
+}
+
+void debug_print(char *msg) {
+  Serial1.println("ok");
+}
+
+//uart messages
+
+void send_ok() {
+  Serial.println("ok");
+  return;
+}
+
+void send_shutdown() {
+  Serial.println("shutdown");
+  return;
+}
+
+void send_abort_shutdown() {
+  Serial.println("abort shutdown");
+  return;
+}
+
 //states
 
-void *server_bootable() {
-  if (Serial) {
-    Serial.println("bootable");
+void *server_bootable () {
+  animate_bootable();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("BOOTABLE");
+    track_uart = millis();
   }
 
-  if (pushlock == LOCKED) {
-    led_red();
-    delay(80);
-    return server_locked;
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+    return server_booting;
   } else {
-    animate_bootable();
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      if (last_heartbeat >= HEARTBEAT_TIMEOUT) {
+        signal_server_locked();
+        return server_locked;
+      }
+    } else {
+      if (digitalRead(BUTTON) == PUSHED) {
+        delay(100);
+        return system_reset;
+      }
+    }
+    return server_bootable;
+  }
+}
 
-    if ((get_last_heartbeat() < HEARTBEAT_TIMEOUT || detect_heartbeat() > 0 )) { // && Serial
-      serial_flush();
+void *server_booting () {
+  animate_booting();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("BOOTING");
+    track_uart = millis();
+  }
+
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+
+    if (receivedHeartbeat > 0) {
+      return server_running;
+    } else {
       return server_booting;
     }
 
-    if (digitalRead(BUTTON)) {
-      delay(100);
-      track_last_heartbeat = millis();
-      serial_flush();
-      return server_reset;
+} else {
+
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
     } else {
-      serial_flush();
+      return server_bootable;
+    }
+
+  }
+}
+
+void *server_running () {
+  animate_running();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("RUNNING");
+    track_uart = millis();
+  }
+
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+      if (receivedHeartbeat > 0) {
+        return server_running;
+      }
+
+      if (digitalRead(PUSHLOCK) == LOCKED) {
+        send_shutdown();
+        return server_shutdown;
+      }
+  } else {
+    if (digitalRead(BUTTON) == PUSHED) {
+      delay(100);
+      //return system_reset;
+    }
+
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
       return server_bootable;
     }
   }
 }
 
-void *server_booting() {
-  if (Serial) {
-    Serial.println("?");
-  }
-
-  if (get_last_heartbeat() > 10000) {
-
-    return server_bootable;
-  }
-
-  if (detect_heartbeat() <= 0) {
-    animate_booting();
-
-    return server_booting;
-  } else {
-
-    return server_running;
-  }
-}
-
-void *server_running() {
-  led_off();
-
-  heartbeat = detect_heartbeat();
-
-  if (Serial) {
-    Serial.println("running");
-    Serial.println(get_last_heartbeat());
-  }
-
-  if (pushlock == LOCKED) {
-    if (get_last_heartbeat() > 30000 || detect_heartbeat() < 0 ) {
-
-      return server_locked;
-    } else {
-      track_uart = millis();
-      return server_shutdown;
-    }
-  } else {
-    if (get_last_heartbeat() > HEARTBEAT_TIMEOUT) {
-
-      return server_hungup;
-    } else {
-
-      return server_running;
-    }
-  }
-
-}
-
 void *server_shutdown() {
+  animate_shutdown();
 
-  if ((millis()-track_uart) > 5000) {
-    if (Serial) {
-      Serial.println("shutdown");
-      delay(100);
-    }
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("SHUTDOWN");
+    send_shutdown();
     track_uart = millis();
   }
 
-  //fade_shutdown(35);
-  led_red();
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
 
-  if (detect_heartbeat_ack() == 1) {
-    return server_shutdown_active;
+    if (digitalRead(BUTTON) == PUSHED) {
+      delay(100);
+      send_abort_shutdown();
+    }
+
+    if (receivedHeartbeat == HEARTBEAT_SHUTDOWN_ACK) {
+      return server_shutdown_active;
+    } else if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
+      return server_running;
+    } else {
+      return server_shutdown;
+    }
+
   } else {
-    return server_shutdown;
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
+      return server_bootable;
+    }
   }
 }
 
 void *server_shutdown_active() {
-  heartbeat = detect_heartbeat();
-  led_heartbeat_missing();
-  delay(100);
-  led_red();
+  animate_shutdown_active();
 
-  if (digitalRead(BUTTON)) {
-    delay(100);
-    track_last_heartbeat = millis();
-    serial_flush();
-    if (detect_heartbeat_abort() == 1) {
-      if (Serial) {
-        Serial.println("abort shutdown");
-      }
-      return server_running;
-    }
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("SHUTDOWN ACTIVE");
+    track_uart = millis();
   }
 
-  if (get_last_heartbeat() < HEARTBEAT_TIMEOUT) {
-    serial_flush();
-    return server_shutdown_active;
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+
+    if ((digitalRead(BUTTON) == PUSHED) || (digitalRead(PUSHLOCK) == UNLOCKED)) {
+      delay(100);
+      send_abort_shutdown();
+    }
+
+    if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
+      send_ok();
+      return server_running;
+    } else {
+      return server_shutdown_active;
+    }
+
   } else {
-    serial_flush();
-    return server_locked;
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
+      return server_bootable;
+    }
   }
 }
 
 void *server_hungup() {
-  if (Serial) {
-    Serial.println("hung up");
-    Serial.println(get_last_heartbeat());
+  animate_hungup();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("HUNG UP");
+    track_uart = millis();
   }
 
-  heartbeat = detect_heartbeat();
-  heartbeat = get_last_heartbeat();
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
 
-  if (heartbeat < HEARTBEAT_TIMEOUT || detect_heartbeat() > 0) {
-
-    return server_running;
-  } else {
-
-    if (heartbeat > HEARTBEAT_TIMEOUT && heartbeat < 20000UL) {
-      animate_hungup(25);
-    } else if (heartbeat > 20000UL && heartbeat < 30000UL) {
-      animate_hungup(15);
-    } else if (heartbeat > 30000UL && heartbeat < 450000UL) {
-      animate_hungup(5);
+    if ()(digitalRead(BUTTON) == PUSHED) || (get_last_heartbeat() >= TIME_UNTIL_REBOOT)) {
+      delay(100);
+      return system_reset;
     }
 
-    if (heartbeat > 45000UL) {
-      led_red();
-    }
-
-    if (get_last_heartbeat() > 60000UL) {
-
-      return server_reset;
+    if (receivedHeartbeat > 0) {}
+      return server_running;
     } else {
-
       return server_hungup;
     }
 
+  } else {
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
+      return server_bootable;
+    }
   }
-}
-
-void *server_reset() {
-  if (Serial) {
-    Serial.println("touching run pins on pi");
-  }
-  touch_run_pin();
-  serial_flush();
-  return server_booting;
 }
 
 void *server_locked() {
-  if (Serial) {
-    Serial.println("LOCKED");
+  animate_locked();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND*10)) {
+    //send_();
+    debug_print("LOCKED");
+    track_uart = millis();
   }
-  if (pushlock == LOCKED) {
-    led_off();
-    serial_flush();
-    return server_locked;
+
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_shutdown;
+    } else {
+      return server_running;
+    }
   } else {
-    serial_flush();
-    return server_bootable;
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
+      return server_bootable;
+    }
+  }
+}
+
+void *system_reset() {
+  animate_reset();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("SYSTEM RESET");
+    track_uart = millis();
+  }
+  touch_run_pin();
+  return server_booting;
+}
+
+void *system_shutdown() {
+  animate_shutdown_active();
+
+  if (((millis()-track_uart) >= WAIT_TO_SEND)) {
+    //send_();
+    debug_print("SYSTEM SHUTDOWN");
+    track_uart = millis();
+  }
+
+  if (digitalRead(SYSTEM_ON) == IS_ON) {
+
+    if ((digitalRead(BUTTON) == PUSHED) || (digitalRead(PUSHLOCK) == UNLOCKED)) {
+      delay(100);
+      send_abort_shutdown();
+    }
+
+    if (receivedHeartbeat > 0) {
+      send_ok();
+      return server_running;
+    } else {
+      return server_shutdown_active;
+    }
+
+  } else {
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      return server_locked;
+    } else {
+      return server_bootable;
+    }
   }
 }
