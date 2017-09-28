@@ -38,14 +38,14 @@ def mode2heartbeat():
 def send_heartbeat():
 	ser.write(B'\x42')
 
-def send_system_shutdown():
-	ser.write(B'\x54')
-
 def send_ack():
 	ser.write(B'\x108')
 
 def send_abort():
 	ser.write(B'\x109')
+
+def send_system_shutdown():
+	ser.write(B'\x54')
 
 try:
 	serialPort = sys.argv[1]
@@ -62,15 +62,16 @@ ser = serial.Serial(
 
 mode = "heartbeat"
 
-commands = {	"heartbeat":      heartbeat,
-		"shutdown":       shutdown,
-		"abort shutdown": abort_shutdown,
-		"ok":             mode2heartbeat,
+commands = {	"heartbeat":      	heartbeat,
+		"shutdown":       	shutdown,
+		"abort shutdown": 	abort_shutdown,
+		"ok":             	mode2heartbeat,
 }
 
-heartbeats = {	"heartbeat":      send_heartbeat,
-		"shutdown":       send_ack,
-		"abort shutdown": send_abort,
+heartbeats = {	"heartbeat":      	send_heartbeat,
+		"shutdown":       	send_ack,
+		"abort shutdown": 	send_abort,
+		"system shutdown":	send_system_shutdown,
 }
 
 signal.signal(signal.SIGINT, handle_interrupt)
@@ -78,6 +79,7 @@ signal.signal(signal.SIGTERM, handle_terminate)
 
 ser.isOpen()
 while True:
+	start_routine = int(round(time.time() * 1000))
 	print(mode)
 	heartbeats[mode]()
 	end_wait = int(round(time.time() * 1000)) + 2950
@@ -85,12 +87,13 @@ while True:
 		bytesToRead = ser.inWaiting()
 		if (bytesToRead > 0):
 			cmd = str(ser.readline(), "utf-8")[:-2]
-			print(cmd)
+			print("Received command: ", cmd)
 			ser.flushInput()
-			mode = cmd
 			try:
 				commands[cmd]()
+				mode = cmd
 			except:
 				print("Command not found: ", cmd)
-
+				mode = "heartbeat"
+	print("Routine took: ", int(round(time.time() * 1000))-start_routine, "ms")
 ser.close()
