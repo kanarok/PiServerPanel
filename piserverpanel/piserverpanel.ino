@@ -75,7 +75,8 @@ void *server_shutdown_active();   void animate_shutdown_active();
 void *server_hungup();            void animate_hungup();
 void *server_locked();            void animate_locked();
 void *system_reset();             void animate_reset();
-void *system_shutdown();  //async trigger in function detect_heartbeat();
+void *system_shutdown();          void animate_system_shutdown();
+//async trigger in function detect_heartbeat();
 
 //FSM
 typedef void *(*StateFunc)();
@@ -198,7 +199,6 @@ void signal_heartbeat_abort() {
   delay(15);
 }
 
-<<<<<<< HEAD
 void signal_heartbeat_system_shutdown() {
   led_color(0,0,255);
   delay(10);
@@ -206,12 +206,6 @@ void signal_heartbeat_system_shutdown() {
   delay(10);
   led_color(0,0,0);
   delay(15);
-=======
-//heartbeat detection
-long detect_heartbeat_any() {
-
->>>>>>> c774d8b760525d033ce5c35391565738e5727941
-}
 
 //heartbeat detection
 long detect_heartbeat_any() {
@@ -403,11 +397,15 @@ void animate_hungup() {
   delay(del);
 }
 
+void animate_locked() {
+
+}
+
 void animate_reset() {
 
 }
 
-void animate_locked() {
+void animate_system_shutdown() {
 
 }
 
@@ -612,7 +610,7 @@ void *server_hungup() {
       return system_reset;
     }
 
-    if (receivedHeartbeat > 0) {}
+    if (receivedHeartbeat > 0) {
       return server_running;
     } else {
       return server_hungup;
@@ -664,7 +662,7 @@ void *system_reset() {
 }
 
 void *system_shutdown() {
-  animate_shutdown_active();
+  animate_system_shutdown();
 
   if (((millis()-track_uart) >= WAIT_TO_SEND)) {
     //send_();
@@ -673,19 +671,7 @@ void *system_shutdown() {
   }
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
-
-    if ((digitalRead(BUTTON) == PUSHED) || (digitalRead(PUSHLOCK) == UNLOCKED)) {
-      delay(100);
-      send_abort_shutdown();
-    }
-
-    if (receivedHeartbeat > 0) {
-      send_ok();
-      return server_running;
-    } else {
-      return server_shutdown_active;
-    }
-
+    return system_shutdown;
   } else {
     if (digitalRead(PUSHLOCK) == LOCKED) {
       return server_locked;
