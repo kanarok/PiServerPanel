@@ -62,7 +62,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="0.80714632"
      inkscape:cx="651.52694"
-     inkscape:cy="235.50803"
+     inkscape:cy="384.17996"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -88,6 +88,13 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(0,-87)">
+    <rect
+       style="opacity:1;fill:#ffffff;fill-opacity:1;stroke:#9b18b7;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1;paint-order:markers stroke fill"
+       id="rect4828"
+       width="297.31546"
+       height="210.12041"
+       x="0"
+       y="87.535194" />
     <image
        y="92.469666"
        x="48.805439"
