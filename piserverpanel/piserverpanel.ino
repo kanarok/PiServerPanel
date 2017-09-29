@@ -5,7 +5,7 @@
 #define LED_B                      10
 
 #define BUTTON                      8
-#define PUSHLOCK                    4
+#define PUSHLOCK                    5
 #define PUSHLOCK_NO                 4
 #define PUSHLOCK_NC                 5
 
@@ -15,36 +15,22 @@
 #define PUSHED                   HIGH
 #define UNDEFINED                   2
 
-#define HEARTBEAT_TIMEOUT          10000
-#define HEARTBEAT_IS_MISSING        3333
-#define HEARTBEAT                   0x42
-#define HEARTBEAT_SYSTEM_SHUTDOWN   0x54
-#define HEARTBEAT_SHUTDOWN_ACK     0x108
-#define HEARTBEAT_ABORT_ACK        0x109
+#define HEARTBEAT_TIMEOUT         10000
+#define HEARTBEAT_IS_MISSING       3333
+#define HEARTBEAT                  0x42
+#define HEARTBEAT_SYSTEM_SHUTDOWN  0x54
+#define HEARTBEAT_SHUTDOWN_ACK     0xA0
+#define HEARTBEAT_ABORT_ACK        0xA9
 
 #define SYSTEM_RUN                  7
-#define SYSTEN_ON                  A3
+#define SYSTEM_ON                  A3
 #define TIME_UNTIL_REBOOT       60000UL
 
 #define BAUDRATE               115200L
-#define WAIT_TO_SEND             1000
+#define WAIT_TO_SEND             3000
 
 //physical routines
 void touch_run_pin();
-
-//heartbeat detection
-long detect_heartbeat_any();
-long detect_heartbeat();
-long detect_heartbeat_ack();
-long detect_heartbeat_abort();
-long get_last_heartbeat();
-
-//heartbeat signals
-void signal_heartbeat();
-void signal_heartbeat_missing();
-void signal_heartbeat_ack();
-void signal_heartbeat_abort();
-void signal_heartbeat_system_shutdown();
 
 //generic led routines
 void led_color(byte red, byte green, byte blue);
@@ -53,10 +39,22 @@ void led_white(byte value);
 void led_red(byte value);
 void led_green(byte value);
 void led_blue(byte value);
+void led_yellow(byte value);
 
 //led signals
 void signal_server_locked();
 //void siganimate_
+
+//heartbeat detection
+int detect_heartbeat();       //sets receivedHeartbeat;
+long get_last_heartbeat();
+
+//heartbeat signals
+void signal_heartbeat();
+void signal_heartbeat_missing();
+void signal_heartbeat_ack();
+void signal_heartbeat_abort();
+void signal_heartbeat_system_shutdown();
 
 //uart routines
 void serial_flush();
@@ -74,13 +72,25 @@ void *server_shutdown();          void animate_shutdown();
 void *server_shutdown_active();   void animate_shutdown_active();
 void *server_hungup();            void animate_hungup();
 void *server_locked();            void animate_locked();
-void *system_reset();             void animate_reset();
+void *system_reset();             void animate_system_reset();
 void *system_shutdown();          void animate_system_shutdown();
 //async trigger in function detect_heartbeat();
+
+//test routines
+void test_led();
+void test_animation();
 
 //FSM
 typedef void *(*StateFunc)();
 StateFunc statefunc = server_bootable;
+
+int pwm_red = 0;
+int pwm_green = 0;
+int pwm_blue = 0;
+
+int fader_red = 7;
+int fader_green = 3;
+int fader_blue = 15;
 
 //++++ cleanup due!
 
@@ -111,8 +121,6 @@ void setup() {
   pinMode(LED_B, OUTPUT);
   pinMode(SYSTEM_RUN, OUTPUT);
 
-  pushlock = digitalRead(PUSHLOCK);
-
   track_last_heartbeat = millis();
   track_missing_heartbeat = track_last_heartbeat;
 
@@ -129,9 +137,9 @@ void loop() {
 //physical routines
 
 void touch_run_pin() {
-  digitalWrite(RUN, HIGH);
+  digitalWrite(SYSTEM_RUN, HIGH);
   delay(50);
-  digitalWrite(RUN, LOW);
+  digitalWrite(SYSTEM_RUN, LOW);
 }
 
 //generic led routines
@@ -145,37 +153,103 @@ void led_off() {
   led_color(0,0,0);
 }
 
-void led_white(byte values {
-  led_color(255-value,255-value,255-value)
+void led_white(byte value) {
+  led_color(value, value, value);
 }
 
 void led_red(byte value) {
-  led_color(255-value, 255, 255);
+  led_color(value, 0, 0);
 }
 
 void led_green(byte value) {
-  led_color(255, 255-byte value, 255);
+  led_color(0, value, 0);
 }
 
 void led_blue(byte value) {
-  led_color(255, 255, 255-byte value);
+  led_color(0, 0, value);
 }
 
+void led_yellow(byte value) {
+  led_color(255, 255, 0);
+}
+
+//led signals
+
+void signal_server_locked() {
+  led_red(255);
+  delay(80);
+}
+
+//heartbeat detection
+
+int detect_heartbeat() {
+  if (((millis()-track_missing_heartbeat) >= HEARTBEAT_IS_MISSING) && get_last_heartbeat() >= HEARTBEAT_IS_MISSING) {
+    if (statefunc != server_bootable) {
+      signal_heartbeat_missing();
+    }
+    track_missing_heartbeat = millis();
+  }
+
+  if (Serial.available() > 0) {
+    incomingByte = Serial.read();
+
+    serial_flush();
+
+    switch (incomingByte) {
+      case HEARTBEAT:
+                  signal_heartbeat();
+                  break;
+      case HEARTBEAT_SYSTEM_SHUTDOWN:
+                  statefunc = system_shutdown;
+                  signal_heartbeat_system_shutdown();
+                  break;
+      case HEARTBEAT_SHUTDOWN_ACK:
+                  signal_heartbeat_ack();
+                  send_ok();
+                  break;
+      case HEARTBEAT_ABORT_ACK:
+                  signal_heartbeat_abort();
+                  send_ok();
+                  break;
+    }
+
+    switch (incomingByte) {
+      case HEARTBEAT:
+      case HEARTBEAT_SYSTEM_SHUTDOWN:
+      case HEARTBEAT_SHUTDOWN_ACK:
+      case HEARTBEAT_ABORT_ACK:
+                  receivedHeartbeat = incomingByte;
+                  track_last_heartbeat = millis();
+                  track_missing_heartbeat = track_last_heartbeat;
+                  return receivedHeartbeat;
+      default:
+                  receivedHeartbeat = -1;
+                  return receivedHeartbeat;
+    }
+  } else {
+    return 0;
+  }
+}
+
+long get_last_heartbeat() {
+  return millis()-track_last_heartbeat;
+}
 
 //heartbeat signals
 void signal_heartbeat() {
-  led_green();
-  delay(10);
-  led_red();
+  led_blue(255);
   delay(10);
   led_off();
+  delay(10);
+  led_blue(150);
   delay(15);
+  led_off();
 }
 
 void signal_heartbeat_missing() {
-  led_red();
+  led_red(255);
   delay(10);
-  led_red();
+  led_red(255);
   delay(10);
   led_off();
   delay(15);
@@ -206,121 +280,58 @@ void signal_heartbeat_system_shutdown() {
   delay(10);
   led_color(0,0,0);
   delay(15);
-
-//heartbeat detection
-long detect_heartbeat_any() {
-
 }
 
-int detect_heartbeat() {
-  if (((millis()-track_missing_heartbeat) >= HEARTBEAT_IS_MISSING) && get_last_heartbeat() >= HEARTBEAT_IS_MISSING) {
-    signal_heartbeat_missing();
-    track_missing_heartbeat = millis();
-  }
+//uart routines
 
-  if (Serial.available() > 0) {
-    incomingByte = Serial.read();
-
-    serial_flush();
-
-    switch (incomingByte) {
-      case 0x42:  // heartbeat
-                  signal_heartbeat();
-                  break;
-      case 0x54:  // system shutdown
-                  statefunc = system_shutdown;
-                  signal_heartbeat_system_shutdown();
-                  break;
-      case 0x108: // ack
-                  signal_heartbeat_ack();
-                  send_ok();
-                  break;
-      case 0x109: // abort (ack)
-                  signal_heartbeat_abort();
-                  send_ok();
-                  break;
-    }
-
-    switch (incomingByte) {
-      case 0x42:  // heartbeat
-      case 0x54:  // system shutdown
-      case 0x108: // ack
-      case 0x109: // cancel (ack)
-                  receivedHeartbeat = incomingByte;
-                  track_last_heartbeat = millis();
-                  track_missing_heartbeat = track_last_heartbeat;
-                  return receivedHeartbeat;
-      default:
-                  receivedHeartbeat = -1;
-                  return receivedHeartbeat;
-    }
-  } else {
-    return 0;
+void serial_flush() {
+  int buf;
+  while (Serial.available() > 0) {
+      buf = Serial.read();
   }
 }
 
-long detect_heartbeat_ack() {
-  if (Serial.available() > 0) {
-    incomingByte = Serial.read();
-
-    serial_flush();
-
-    if (incomingByte == 0x108) {
-      send_ok();
-      signal_heartbeat_ack();
-      return 1;
-    } else {
-      return 0;
-    }
-  } else {
-    return -1;
-  }
+void debug_print(char *msg) {
+  //Serial.println(msg);
 }
 
-long detect_heartbeat_abort() {
-  if (Serial.available() > 0) {
-    incomingByte = Serial.read();
+//uart messages
 
-    serial_flush();
-
-    if (incomingByte == 0x109) {
-      send_ok();
-      signal_heartbeat_abort();
-      return 1;
-    } else {
-      return 0;
-    }
-  } else {
-    return -1;
-  }
+void send_ok() {
+  Serial.println("ok");
 }
 
-long get_last_heartbeat() {
-  return millis()-track_last_heartbeat;
+void send_shutdown() {
+  Serial.println("shutdown");
+}
+
+void send_abort_shutdown() {
+  Serial.println("abort shutdown");
 }
 
 //state matching led animations
 
 void animate_bootable() {
-  int del = 45;
-  analogWrite(LED_R, 255);
-  analogWrite(LED_G, 255-c_g);
-  analogWrite(LED_B, 255);
-
-  c_g = c_g - fade_g;
-
-  if ( c_g > 88 ) {
-    c_g = 87;
+  int ms = 45;
+  int min_value = 0;
+  int max_value = 150;
+  
+  led_green(pwm_green);
+  
+  pwm_green = pwm_green + fader_green;
+  
+  if ( pwm_green > max_value+1 ) {
+    pwm_green = max_value;
   }
 
-  if ( c_g <= 0 || c_g >= 87 ) {
-    fade_g = -fade_g;
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
   }
 
-  if (fade_g > 0) {
-   delay(del/2);
+  if (fader_green > 0) {
+   delay(ms/2);
   } else {
-   delay(del);
+   delay(ms);
   }
 }
 
@@ -354,33 +365,82 @@ void animate_booting() {
   delay(fade_delay);
 }
 
-void animate_running();
+void animate_running() {
+  int ms = 20;
+  int min_value = 0;
+  int max_value = 255;
+  
+  led_color(pwm_red, pwm_green, pwm_blue);
+  
+  pwm_red = pwm_red + fader_red;
+  pwm_green = pwm_green + fader_green;
+  pwm_blue = pwm_blue + fader_blue;
+
+  if ( pwm_red <= min_value || pwm_red >= max_value ) {
+    fader_red = -fader_red;
+  }
+
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
+  }
+  
+  if ( pwm_blue <= min_value || pwm_blue >= max_value ) {
+    fader_blue = -fader_blue;
+  }
+
+  if (fader_green > 0) {
+   delay(ms);
+  } else {
+   delay(ms/2);
+  }
+}
 
 void animate_shutdown() {
-  int del = 20;
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255-c_r);
-  analogWrite(LED_B, 255);
-
-  c_r = c_r + fade_b;
-
-  if (c_r > 141) {
-    c_r = 140;
+  int ms = 45;
+  int min_value = 0;
+  int max_value = 150;
+  
+  led_yellow(pwm_green);
+  
+  pwm_green = pwm_green + fader_green;
+  
+  if ( pwm_green > max_value+1 ) {
+    pwm_green = max_value;
   }
 
-  if ( c_r <= 0 || c_r >= 140 ) {
-    fade_b = -fade_b;
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
   }
 
-  if (fade_b > 0) {
-   delay(del);
+  if (fader_green > 0) {
+   delay(ms);
   } else {
-   delay(del/3);
+   delay(ms);
   }
 }
 
 void animate_shutdown_active() {
+  int ms = 15;
+  int min_value = 0;
+  int max_value = 150;
+  
+  led_yellow(pwm_green);
+  
+  pwm_green = pwm_green + fader_green;
+  
+  if ( pwm_green > max_value+1 ) {
+    pwm_green = max_value;
+  }
 
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
+  }
+
+  if (fader_green > 0) {
+   delay(ms);
+  } else {
+   delay(ms/3);
+  }
 }
 
 void animate_hungup() {
@@ -394,49 +454,29 @@ void animate_hungup() {
     fade_r = -fade_r;
   }
 
-  delay(del);
+  delay(20);
 }
 
 void animate_locked() {
 
 }
 
-void animate_reset() {
-
+void animate_system_reset() {
+  led_red(255);
+  delay(20);
+  led_yellow(255);
+  delay(40);
+  led_off();
+  delay(10);
+  led_red(255);
+  delay(20);
+  led_yellow(255);
+  delay(40);
+  delay(10);
 }
 
 void animate_system_shutdown() {
 
-}
-
-//uart routines
-
-void serial_flush() {
-  int buf;
-  while (Serial.available() > 0) {
-      buf = Serial.read();
-  }
-}
-
-void debug_print(char *msg) {
-  Serial1.println("ok");
-}
-
-//uart messages
-
-void send_ok() {
-  Serial.println("ok");
-  return;
-}
-
-void send_shutdown() {
-  Serial.println("shutdown");
-  return;
-}
-
-void send_abort_shutdown() {
-  Serial.println("abort shutdown");
-  return;
 }
 
 //states
@@ -506,13 +546,13 @@ void *server_running () {
   }
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
-      if (receivedHeartbeat > 0) {
-        return server_running;
-      }
-
       if (digitalRead(PUSHLOCK) == LOCKED) {
         send_shutdown();
         return server_shutdown;
+      } else {
+        if (receivedHeartbeat > 0) {
+          return server_running;
+        }
       }
   } else {
     if (digitalRead(BUTTON) == PUSHED) {
@@ -535,23 +575,32 @@ void *server_shutdown() {
     //send_();
     debug_print("SHUTDOWN");
     send_shutdown();
-    track_uart = millis();
+    track_uart = millis(); 
   }
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
 
-    if (digitalRead(BUTTON) == PUSHED) {
-      delay(100);
-      send_abort_shutdown();
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      
+      if (receivedHeartbeat == HEARTBEAT_SHUTDOWN_ACK) {
+        send_ok();
+        return server_shutdown_active;
+      }      
+      
+    } else {
+      
+      if (digitalRead(BUTTON) == PUSHED) {
+        delay(100);
+        send_abort_shutdown();
+      }  
+
+      if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
+        return server_running;
+      }
+      
     }
 
-    if (receivedHeartbeat == HEARTBEAT_SHUTDOWN_ACK) {
-      return server_shutdown_active;
-    } else if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
-      return server_running;
-    } else {
-      return server_shutdown;
-    }
+    return server_shutdown;
 
   } else {
     if (digitalRead(PUSHLOCK) == LOCKED) {
@@ -573,8 +622,8 @@ void *server_shutdown_active() {
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
 
-    if ((digitalRead(BUTTON) == PUSHED) || (digitalRead(PUSHLOCK) == UNLOCKED)) {
-      delay(100);
+    if ((digitalRead(BUTTON) == PUSHED) && (digitalRead(PUSHLOCK) == UNLOCKED)) {
+      delay(300);
       send_abort_shutdown();
     }
 
@@ -605,7 +654,7 @@ void *server_hungup() {
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
 
-    if ()(digitalRead(BUTTON) == PUSHED) || (get_last_heartbeat() >= TIME_UNTIL_REBOOT)) {
+    if ((digitalRead(BUTTON) == PUSHED) || (get_last_heartbeat() >= TIME_UNTIL_REBOOT)) {
       delay(100);
       return system_reset;
     }
@@ -650,7 +699,7 @@ void *server_locked() {
 }
 
 void *system_reset() {
-  animate_reset();
+  animate_system_reset();
 
   if (((millis()-track_uart) >= WAIT_TO_SEND)) {
     //send_();
@@ -679,4 +728,49 @@ void *system_shutdown() {
       return server_bootable;
     }
   }
+}
+
+//test routines
+
+void test_led() {
+  debug_print("LED TEST");
+  debug_print("led off");
+  led_off();
+  delay(2000);
+  debug_print("led red");
+  led_red(255);
+  delay(2000);
+  debug_print("led white");
+  led_white(255);
+  delay(2000);
+  debug_print("led green");
+  led_green(100);
+  delay(2000);
+  debug_print("led blue");
+  led_blue(255);
+  delay(2000);
+  debug_print("led yellow");
+  led_yellow(255);
+  delay(2000);
+}
+
+void test_animation() {
+  debug_print("ANIMATION TEST");
+  animate_bootable();
+  delay(100);
+  animate_booting();
+  delay(100);
+  animate_running();
+  delay(100);
+  animate_shutdown();
+  delay(100);
+  animate_shutdown_active();
+  delay(100);
+  animate_hungup();
+  delay(100);
+  animate_locked();
+  delay(100);
+  animate_system_reset();
+  delay(100);
+  animate_system_shutdown();
 }
