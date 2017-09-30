@@ -8,12 +8,12 @@ Please note, there is a picture to visualize the components and simple wiring us
 <br />
 The code features a callback state machine.<br />
 There are 8 states:<br />
-server_bootable (initial state)<br />
+server_bootable (initial state, green pulsing animation)<br />
 server_booting (kind of useless \*1)<br />
-server_running<br />
+server_running (colorful happy animation)<br />
 server_hungup (untested)<br />
-server_shutdown (when emergency switch is locked)<br />
-server_shutdown_active (when pi issued shutdown command)<br />
+server_shutdown (when emergency switch is locked, yellow pulse animation unseen)<br />
+server_shutdown_active (when pi issued shutdown command, red quick pulse animation)<br />
 system_reset (touches run pins on pi)<br />
 system_shutdown (untested, when pi is shutdown a special heartbeat is issued to the panel)<br />
 <br />
