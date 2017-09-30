@@ -445,7 +445,27 @@ void animate_hungup() {
 }
 
 void animate_locked() {
+  int ms = 80;
+  int min_value = 0;
+  int max_value = 150;
+  
+  led_color(pwm_yellow, pwm_yellow, 10);
+  
+  pwm_yellow = pwm_yellow + fader_red;
+  
+  if ( pwm_yellow > max_value+1 ) {
+    pwm_yellow = max_value;
+  }
 
+  if ( pwm_yellow <= min_value || pwm_yellow >= max_value ) {
+    fader_red = -fader_red;
+  }
+
+  if (fader_yellow > 0) {
+   delay(ms);
+  } else {
+   delay(ms);
+  }
 }
 
 void animate_system_reset() {
