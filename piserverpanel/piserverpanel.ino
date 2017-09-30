@@ -87,22 +87,12 @@ StateFunc statefunc = server_bootable;
 int pwm_red = 0;
 int pwm_green = 0;
 int pwm_blue = 0;
+int pwm_yellow = 0;
 
 int fader_red = 7;
 int fader_green = 3;
 int fader_blue = 15;
-
-//++++ cleanup due!
-
-int c_r = 0;
-int c_g = 0;
-int c_b = 0;
-int fade_r = 7;
-int fade_g = 3;
-int fade_b = 15;
-int fade_delay = 5;
-int fdel = 1;
-int cmode = 0;
+int fader_yellow = 10;
 
 int incomingByte = 0;
 int receivedHeartbeat = 0;
@@ -184,7 +174,7 @@ void signal_server_locked() {
 
 int detect_heartbeat() {
   if (((millis()-track_missing_heartbeat) >= HEARTBEAT_IS_MISSING) && get_last_heartbeat() >= HEARTBEAT_IS_MISSING) {
-    if (statefunc != server_bootable) {
+    if ((statefunc != server_bootable) && (statefunc != server_locked)) {
       signal_heartbeat_missing();
     }
     track_missing_heartbeat = millis();
@@ -257,27 +247,29 @@ void signal_heartbeat_missing() {
 
 void signal_heartbeat_ack() {
   led_color(255,0,255);
+  delay(20);
+  led_off();
   delay(10);
   led_color(255,0,255);
   delay(10);
-  led_color(0,0,0);
+  led_off();
   delay(15);
 }
 
 void signal_heartbeat_abort() {
-  led_color(0,0,255);
+  led_blue(255);
   delay(10);
-  led_color(255,255,255);
+  led_white(255);
   delay(10);
-  led_color(0,0,0);
+  led_off();
   delay(15);
 }
 
 void signal_heartbeat_system_shutdown() {
-  led_color(0,0,255);
-  delay(10);
+  led_blue(255);
+  delay(30);
   led_color(90,20,200);
-  delay(10);
+  delay(20);
   led_color(0,0,0);
   delay(15);
 }
@@ -336,33 +328,33 @@ void animate_bootable() {
 }
 
 void animate_booting() {
-  int del = 20;
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255-c_g);
-  analogWrite(LED_B, 255-c_b);
+  int ms = 45;
+  int min_value = 0;
+  int max_value = 255;
+  
+  led_color(pwm_red, pwm_green, pwm_blue);
+  
+  pwm_red = pwm_red + fader_red;
+  pwm_green = pwm_green + fader_green;
+  pwm_blue = pwm_blue + fader_blue;
 
-  //analogWrite(LED_G, 255);
-  //analogWrite(LED_B, 255);
-
-  c_r = c_r + fade_r;
-  c_g = c_g + fade_g;
-  c_b = c_b + fade_b;
-
-  if ( c_r <= 0 || c_r >= 200 ) {
-    fade_r = -fade_r;
-  }
-  if ( c_g <= 0 || c_g >= 255 ) {
-    fade_g = -fade_g;
-  }
-  if ( c_b <= 0 || c_b >= 155 ) {
-    fade_b = -fade_b;
+  if ( pwm_red <= min_value || pwm_red >= max_value ) {
+    fader_red = -fader_red;
   }
 
-  fade_delay = fade_delay + fdel;
-  if (fade_delay <= 1 || fade_delay >=del) {
-    fdel = -fdel;
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
   }
-  delay(fade_delay);
+  
+  if ( pwm_blue <= min_value || pwm_blue >= max_value ) {
+    fader_blue = -fader_blue;
+  }
+
+  if (fader_green > 0) {
+   delay(ms);
+  } else {
+   delay(ms/2);
+  }
 }
 
 void animate_running() {
@@ -400,19 +392,19 @@ void animate_shutdown() {
   int min_value = 0;
   int max_value = 150;
   
-  led_yellow(pwm_green);
+  led_yellow(pwm_yellow);
   
-  pwm_green = pwm_green + fader_green;
+  pwm_yellow = pwm_yellow + fader_yellow;
   
-  if ( pwm_green > max_value+1 ) {
-    pwm_green = max_value;
+  if ( pwm_yellow > max_value+1 ) {
+    pwm_yellow = max_value;
   }
 
-  if ( pwm_green <= min_value || pwm_green >= max_value ) {
-    fader_green = -fader_green;
+  if ( pwm_yellow <= min_value || pwm_yellow >= max_value ) {
+    fader_yellow = -fader_yellow;
   }
 
-  if (fader_green > 0) {
+  if (fader_yellow > 0) {
    delay(ms);
   } else {
    delay(ms);
@@ -424,19 +416,19 @@ void animate_shutdown_active() {
   int min_value = 0;
   int max_value = 150;
   
-  led_yellow(pwm_green);
+  led_red(pwm_yellow);
   
-  pwm_green = pwm_green + fader_green;
+  pwm_yellow = pwm_yellow + fader_yellow;
   
-  if ( pwm_green > max_value+1 ) {
-    pwm_green = max_value;
+  if ( pwm_yellow > max_value+1 ) {
+    pwm_yellow = max_value;
   }
 
-  if ( pwm_green <= min_value || pwm_green >= max_value ) {
-    fader_green = -fader_green;
+  if ( pwm_yellow <= min_value || pwm_yellow >= max_value ) {
+    fader_yellow = -fader_yellow;
   }
 
-  if (fader_green > 0) {
+  if (fader_yellow > 0) {
    delay(ms);
   } else {
    delay(ms/3);
@@ -444,16 +436,9 @@ void animate_shutdown_active() {
 }
 
 void animate_hungup() {
-  analogWrite(LED_R, 255-c_r);
-  analogWrite(LED_G, 255);
-  analogWrite(LED_B, 255);
-
-  c_r = c_r + fade_r;
-
-  if ( c_r <= 0 || c_r >= 255 ) {
-    fade_r = -fade_r;
-  }
-
+  led_yellow(255);
+  delay(80);
+  led_off();
   delay(20);
 }
 
