@@ -1,5 +1,7 @@
 #include <TimerOne.h>
 
+//Version: beta mk I
+
 #define LED_R                       6
 #define LED_G                       9
 #define LED_B                      10

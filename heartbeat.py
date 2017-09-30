@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+#Version: beta mk I
+
 import serial, sys, time, signal
 import RPi.GPIO as GPIO
 
