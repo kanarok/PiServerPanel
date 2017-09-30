@@ -531,20 +531,24 @@ void *server_running () {
   }
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
-      if (digitalRead(PUSHLOCK) == LOCKED) {
-        send_shutdown();
-        return server_shutdown;
-      } else {
-        if (receivedHeartbeat > 0) {
-          return server_running;
-        }
+    
+    if (digitalRead(PUSHLOCK) == LOCKED) {
+      send_shutdown();
+      return server_shutdown;
+    } else {
+      if (receivedHeartbeat > 0) {
+        return server_running;
       }
-  } else {
-    if (digitalRead(BUTTON) == PUSHED) {
-      delay(100);
-      //return system_reset;
     }
 
+
+    if (digitalRead(BUTTON) == PUSHED) {
+      delay(100);
+      //print mail or sth. else
+    }
+      
+  } else {
+    
     if (digitalRead(PUSHLOCK) == LOCKED) {
       return server_locked;
     } else {
@@ -615,17 +619,19 @@ void *server_shutdown_active() {
     if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
       send_ok();
       return server_running;
-    } else {
-      return server_shutdown_active;
     }
 
   } else {
-    if (digitalRead(PUSHLOCK) == LOCKED) {
-      return server_locked;
-    } else {
-      return server_bootable;
+    if (get_last_heartbeat() > HEARTBEAT_TIMEOUT) {
+      if (digitalRead(PUSHLOCK) == LOCKED) {
+        return server_locked;
+      } else {
+        return server_bootable;
+      }
     }
   }
+  
+  return server_shutdown_active;
 }
 
 void *server_hungup() {
@@ -704,7 +710,7 @@ void *system_shutdown() {
     track_uart = millis();
   }
 
-  if (digitalRead(SYSTEM_ON) == IS_ON) {
+  if ((digitalRead(SYSTEM_ON) == IS_ON) || (get_last_heartbeat() < HEARTBEAT_TIMEOUT)) {
     return system_shutdown;
   } else {
     if (digitalRead(PUSHLOCK) == LOCKED) {
