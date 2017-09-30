@@ -461,7 +461,10 @@ void animate_system_reset() {
 }
 
 void animate_system_shutdown() {
-
+  led_color(190, 70, 100);
+  delay(80);
+  led_off();
+  delay(20);
 }
 
 //states
