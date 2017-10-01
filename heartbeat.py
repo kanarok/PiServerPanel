@@ -1,13 +1,19 @@
 #!/usr/bin/env python
 
-#Version: beta mk I
+#Version: beta mk II
 
 import serial, sys, time, signal
 import RPi.GPIO as GPIO
 
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(12, GPIO.OUT)
-GPIO.output(12, 1)
+def gpio_setup():
+	GPIO.setmode(GPIO.BOARD)
+	GPIO.setup(40, GPIO.OUT)
+
+def gpio_on():
+	GPIO.output(40, 1)
+
+def gpio_off():
+	GPIO.output(40, 0)
 
 def handle_interrupt(signal, frame):
 	GPIO.cleanup()
@@ -18,7 +24,7 @@ def handle_interrupt(signal, frame):
 def handle_terminate(signal, frame):
 	print("terminated, sending 'system shutdown' to panel")
 	send_system_shutdown()
-	GPIO.output(12, 0)
+	gpio_off()
 
 def heartbeat():
 	send_heartbeat()
@@ -84,6 +90,9 @@ heartbeats = {	"heartbeat":      	send_heartbeat,
 		"system shutdown":	send_system_shutdown,
 		"ok":             	mode2heartbeat,
 }
+
+gpio_setup()
+gpio_on()
 
 signal.signal(signal.SIGINT, handle_interrupt)
 signal.signal(signal.SIGTERM, handle_terminate)

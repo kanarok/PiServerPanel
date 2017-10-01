@@ -1,21 +1,21 @@
 #include <TimerOne.h>
 
-//Version: beta mk I
+//Version: beta mk II
 
-#define LED_R                       6
-#define LED_G                       9
-#define LED_B                      10
+#define LED_R                         6
+#define LED_G                         9
+#define LED_B                        10
 
-#define BUTTON                      8
-#define PUSHLOCK                    5
-#define PUSHLOCK_NO                 4
-#define PUSHLOCK_NC                 5
+#define BUTTON                        8
+#define PUSHLOCK                      5
+#define PUSHLOCK_NO                   4
+#define PUSHLOCK_NC                   5
 
-#define LOCKED                    LOW
-#define UNLOCKED                 HIGH
-#define IS_ON                    HIGH
-#define PUSHED                   HIGH
-#define UNDEFINED                   2
+#define LOCKED                      LOW
+#define UNLOCKED                   HIGH
+#define IS_ON                      HIGH
+#define PUSHED                     HIGH
+#define UNDEFINED                     2
 
 #define HEARTBEAT_TIMEOUT         10000
 #define HEARTBEAT_IS_MISSING       3333
@@ -24,19 +24,20 @@
 #define HEARTBEAT_SHUTDOWN_ACK     0xA0
 #define HEARTBEAT_ABORT_ACK        0xA9
 
-#define SYSTEM_RUN                  7
-#define SYSTEM_ON                  A3
-#define TIME_UNTIL_REBOOT       60000UL
+#define SYSTEM_RUN                    7
+#define SYSTEM_ON                    A3
+#define TIME_UNTIL_REBOOT         60000UL
 
-#define BAUDRATE               115200L
-#define WAIT_TO_SEND             3000
+#define BAUDRATE                 115200L
+#define WAIT_TO_SEND               3000
 
-//physical routines
+//generic routines
+void next_animation();
 void touch_run_pin();
 
 //generic led routines
 void led_color(byte red, byte green, byte blue);
-void led_off(byte value);
+void led_off();
 void led_white(byte value);
 void led_red(byte value);
 void led_green(byte value);
@@ -69,7 +70,7 @@ void send_abort_shutdown();
 //States                          //state matching led animations
 void *server_bootable();          void animate_bootable();
 void *server_booting();           void animate_booting();
-void *server_running();           void animate_running();
+void *server_running();           void animate_running(); void animate_running2();
 void *server_shutdown();          void animate_shutdown();
 void *server_shutdown_active();   void animate_shutdown_active();
 void *server_hungup();            void animate_hungup();
@@ -81,6 +82,11 @@ void *system_shutdown();          void animate_system_shutdown();
 //test routines
 void test_led();
 void test_animation();
+
+//AnimationList
+typedef void (*AnimationList[])();
+AnimationList animations = { led_off, animate_running, led_off, animate_running2 };
+byte showAnimation = 1;
 
 //FSM
 typedef void *(*StateFunc)();
@@ -126,7 +132,11 @@ void loop() {
   statefunc = (StateFunc)(*statefunc)();    //FSM
 }
 
-//physical routines
+//generic routines
+
+void next_animation() {
+  showAnimation = (showAnimation + 1) % (sizeof(animations) / sizeof(void *));
+}
 
 void touch_run_pin() {
   digitalWrite(SYSTEM_RUN, HIGH);
@@ -389,6 +399,36 @@ void animate_running() {
   }
 }
 
+void animate_running2() {
+  int ms = 5;
+  int min_value = 0;
+  int max_value = 255;
+  
+  led_color(pwm_green, pwm_blue, pwm_red);
+  
+  pwm_red = pwm_red + fader_red;
+  pwm_green = pwm_green + fader_green;
+  pwm_blue = pwm_blue + fader_blue;
+
+  if ( pwm_red <= min_value || pwm_red >= max_value ) {
+    fader_red = -fader_red;
+  }
+
+  if ( pwm_green <= min_value || pwm_green >= max_value ) {
+    fader_green = -fader_green;
+  }
+  
+  if ( pwm_blue <= min_value || pwm_blue >= max_value ) {
+    fader_blue = -fader_blue;
+  }
+
+  if (fader_green > 0) {
+   delay(ms);
+  } else {
+   delay(ms/2);
+  }
+}
+
 void animate_shutdown() {
   int ms = 45;
   int min_value = 0;
@@ -547,7 +587,8 @@ void *server_booting () {
 }
 
 void *server_running () {
-  animate_running();
+  //animate_running();
+  animations[showAnimation]();
 
   if (((millis()-track_uart) >= WAIT_TO_SEND)) {
     //send_();
@@ -556,6 +597,12 @@ void *server_running () {
   }
 
   if (digitalRead(SYSTEM_ON) == IS_ON) {
+
+    if (digitalRead(BUTTON) == PUSHED) {
+      next_animation();
+      delay(100);
+      //print mail or sth. else
+    }
     
     if (digitalRead(PUSHLOCK) == LOCKED) {
       send_shutdown();
@@ -564,12 +611,6 @@ void *server_running () {
       if (receivedHeartbeat > 0) {
         return server_running;
       }
-    }
-
-
-    if (digitalRead(BUTTON) == PUSHED) {
-      delay(100);
-      //print mail or sth. else
     }
       
   } else {
