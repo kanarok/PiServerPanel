@@ -16,6 +16,7 @@
 #define IS_ON                      HIGH
 #define PUSHED                     HIGH
 #define UNDEFINED                     2
+#define BUTTON_DELAY                250
 
 #define HEARTBEAT_TIMEOUT         10000
 #define HEARTBEAT_IS_MISSING       3333
@@ -550,7 +551,7 @@ void *server_bootable () {
       }
     } else {
       if (digitalRead(BUTTON) == PUSHED) {
-        delay(100);
+        delay(BUTTON_DELAY);
         return system_reset;
       }
     }
@@ -600,7 +601,7 @@ void *server_running () {
 
     if (digitalRead(BUTTON) == PUSHED) {
       next_animation();
-      delay(100);
+      delay(BUTTON_DELAY);
       //print mail or sth. else
     }
     
@@ -645,8 +646,8 @@ void *server_shutdown() {
     } else {
       
       if (digitalRead(BUTTON) == PUSHED) {
-        delay(100);
         send_abort_shutdown();
+        delay(BUTTON_DELAY);
       }  
 
       if (receivedHeartbeat == HEARTBEAT_ABORT_ACK) {
@@ -712,7 +713,7 @@ void *server_hungup() {
   if (digitalRead(SYSTEM_ON) == IS_ON) {
 
     if ((digitalRead(BUTTON) == PUSHED) || (get_last_heartbeat() >= TIME_UNTIL_REBOOT)) {
-      delay(100);
+      delay(BUTTON_DELAY);
       return system_reset;
     }
 
