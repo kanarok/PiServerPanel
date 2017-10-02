@@ -101,6 +101,8 @@ ser.isOpen()
 while True:
 #	start_routine = int(round(time.time() * 1000))
 #	print("Heartbeat: ", mode)
+	if (mode == "ok"):
+		mode = "heartbeat"
 	heartbeats[mode]()
 	end_wait = int(round(time.time() * 1000)) + 2950
 	while (int(round(time.time() * 1000)) < end_wait):
