@@ -16,6 +16,7 @@ def gpio_off():
 	GPIO.output(40, 0)
 
 def handle_interrupt(signal, frame):
+	gpio_off()
 	GPIO.cleanup()
 	print("closing serial port...")
 	ser.close()
@@ -25,6 +26,8 @@ def handle_terminate(signal, frame):
 	print("terminated, sending 'system shutdown' to panel")
 	send_system_shutdown()
 	gpio_off()
+	GPIO.cleanup()
+	sys.exit(0)
 
 def heartbeat():
 	send_heartbeat()
